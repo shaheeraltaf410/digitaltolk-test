@@ -1,45 +1,49 @@
-Do at least ONE of the following tasks: refactor is mandatory. Write tests is optional, will be good bonus to see it. 
-Please do not invest more than 2-4 hours on this.
-Upload your results to a Github repo, for easier sharing and reviewing.
+What's Good:
 
-Thank you and good luck!
+Dependency Injection: The code uses dependency injection in the constructor to inject the BookingRepository, which is a good practice for managing dependencies and making the code more testable.
 
+Controller Methods: Each method in the controller is relatively small and seems to have a clear responsibility. This adheres to the Single Responsibility Principle (SRP).
 
+Comments: Some of the methods have comments explaining their purpose, which is helpful for understanding the code.
 
-Code to refactor
-=================
-1) app/Http/Controllers/BookingController.php
-2) app/Repository/BookingRepository.php
+he code utilizes Laravel's Eloquent ORM for database interactions, which is a recommended approach for database operations in Laravel applications.
 
-Code to write tests (optional)
-=====================
-3) App/Helpers/TeHelper.php method willExpireAt
-4) App/Repository/UserRepository.php, method createOrUpdate
+----------------------------------------------------------------------------------------------------------------
 
 
-----------------------------
 
-What I expect in your repo:
+What's Okay:
 
-X. A readme with:   Your thoughts about the code. What makes it amazing code. Or what makes it ok code. Or what makes it terrible code. How would you have done it. Thoughts on formatting, structure, logic.. The more details that you can provide about the code (what's terrible about it or/and what is good about it) the easier for us to assess your coding style, mentality etc
+Some function are extremely long. It's okay as long as it's well-documented and easy to understand. However, it might benefit from some refactoring to improve readability.
 
-And 
+It's not clear from this code whether input validation is being performed. Input validation is essential for security, so it should be handled either in middleware or within these methods.
 
-Y.  Refactor it if you feel it needs refactoring. The more love you put into it. The easier for us to asses your thoughts, code principles etc
+Some numeric values like '15' and '5' appear in the code without clear context. These should be replaced with named constants or configuration values to improve code readability and maintainability.
 
+There are some cURL call using PHP cURL functions. It's better to use HTTP facede or GuzzleHttp for better performance in laravel.
 
-IMPORTANT: Make two commits. First commit with original code. Second with your refactor so we can easily trace changes. 
-
-
-NB: you do not need to set up the code on local and make the web app run. It will not run as its not a complete web app. This is purely to assess you thoughts about code, formatting, logic etc
+-----------------------------------------------------------------------------------------------------------------
 
 
-===== So expected output is a GitHub link with either =====
+What Could Be Improved:
 
-1. Readme described above (point X above) + refactored code 
-OR
-2. Readme described above (point X above) + refactored core + a unit test of the code that we have sent
+The code hardcodes environment variables like env('ADMIN_ROLE_ID') and env('SUPERADMIN_ROLE_ID'). It's better to define these values in a configuration file or use Laravel's configuration system to make them more maintainable.
 
-Thank you!
+The code lacks proper error handling. It should include try-catch blocks or appropriate validation to handle potential errors, especially in methods like resendSMSNotifications, where an exception might occur.
+
+Some variables are named with underscores (e.g., $adminSenderEmail), while others use camelCase (e.g., $admincomment). Consistency in variable naming conventions would make the code easier to read.
+
+Some methods are quite long and contains a lot of conditional logic. It would be beneficial to refactor this method into smaller, more manageable functions to improve readability and maintainability.
+
+There's some code duplication in terms of extracting data from the request ($data = $request->all();). Consider centralizing such common operations to reduce duplication.
+
+----------------------------------------------------------------------------------------------------------------------
 
 
+In summary, the code demonstrates some good practices but also has room for improvement in terms of readability, maintainability, and error handling. Refactoring and following Laravel's conventions more closely would help in making the code more robust and easier to maintain. Additionally, adding input validation and error handling would be crucial for production-ready code.
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+NOTE:
+In app/Repository/BookingRepository.php, I just refactor the few methods due to limited time. I just spent couple of hours on the task.

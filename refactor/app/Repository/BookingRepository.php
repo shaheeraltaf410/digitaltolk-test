@@ -59,31 +59,61 @@ class BookingRepository extends BaseRepository
     {
         $cuser = User::find($user_id);
         $usertype = '';
-        $emergencyJobs = array();
-        $noramlJobs = array();
-        if ($cuser && $cuser->is('customer')) {
-            $jobs = $cuser->jobs()->with('user.userMeta', 'user.average', 'translatorJobRel.user.average', 'language', 'feedback')->whereIn('status', ['pending', 'assigned', 'started'])->orderBy('due', 'asc')->get();
-            $usertype = 'customer';
-        } elseif ($cuser && $cuser->is('translator')) {
-            $jobs = Job::getTranslatorJobs($cuser->id, 'new');
-            $jobs = $jobs->pluck('jobs')->all();
-            $usertype = 'translator';
+    
+        $emergencyJobs = [];
+        $normalJobs = [];
+    
+        if ($cuser) {
+            if ($cuser->is('customer')) {
+                $jobs = $this->getCustomerJobs($cuser);
+                $usertype = 'customer';
+            } elseif ($cuser->is('translator')) {
+                $jobs = $this->getTranslatorJobs($cuser);
+                $usertype = 'translator';
+            }
         }
+    
         if ($jobs) {
             foreach ($jobs as $jobitem) {
-                if ($jobitem->immediate == 'yes') {
-                    $emergencyJobs[] = $jobitem;
-                } else {
-                    $noramlJobs[] = $jobitem;
-                }
+                $this->separateJobsByType($jobitem, $emergencyJobs, $normalJobs);
             }
-            $noramlJobs = collect($noramlJobs)->each(function ($item, $key) use ($user_id) {
+    
+            $normalJobs = collect($normalJobs)->each(function ($item) use ($user_id) {
                 $item['usercheck'] = Job::checkParticularJob($user_id, $item);
             })->sortBy('due')->all();
         }
-
-        return ['emergencyJobs' => $emergencyJobs, 'noramlJobs' => $noramlJobs, 'cuser' => $cuser, 'usertype' => $usertype];
+    
+        return [
+            'emergencyJobs' => $emergencyJobs,
+            'normalJobs' => $normalJobs,
+            'cuser' => $cuser,
+            'usertype' => $usertype,
+        ];
     }
+
+    private function getCustomerJobs($cuser)
+    {
+        return $cuser->jobs()
+            ->with('user.userMeta', 'user.average', 'translatorJobRel.user.average', 'language', 'feedback')
+            ->whereIn('status', ['pending', 'assigned', 'started'])
+            ->orderBy('due', 'asc')
+            ->get();
+    }
+
+    private function getTranslatorJobs($cuser)
+    {
+        $jobs = Job::getTranslatorJobs($cuser->id, 'new');
+        return $jobs->pluck('jobs')->all();
+    }
+
+    private function separateJobsByType($jobitem, &$emergencyJobs, &$normalJobs)
+    {
+        if ($jobitem->immediate === 'yes') {
+            $emergencyJobs[] = $jobitem;
+        } else {
+            $normalJobs[] = $jobitem;
+        }
+}
 
     /**
      * @param $user_id
@@ -91,34 +121,53 @@ class BookingRepository extends BaseRepository
      */
     public function getUsersJobsHistory($user_id, Request $request)
     {
-        $page = $request->get('page');
-        if (isset($page)) {
-            $pagenum = $page;
-        } else {
-            $pagenum = "1";
-        }
+        $page = $request->get('page', 1);
         $cuser = User::find($user_id);
         $usertype = '';
-        $emergencyJobs = array();
-        $noramlJobs = array();
-        if ($cuser && $cuser->is('customer')) {
-            $jobs = $cuser->jobs()->with('user.userMeta', 'user.average', 'translatorJobRel.user.average', 'language', 'feedback', 'distance')->whereIn('status', ['completed', 'withdrawbefore24', 'withdrawafter24', 'timedout'])->orderBy('due', 'desc')->paginate(15);
-            $usertype = 'customer';
-            return ['emergencyJobs' => $emergencyJobs, 'noramlJobs' => [], 'jobs' => $jobs, 'cuser' => $cuser, 'usertype' => $usertype, 'numpages' => 0, 'pagenum' => 0];
-        } elseif ($cuser && $cuser->is('translator')) {
-            $jobs_ids = Job::getTranslatorJobsHistoric($cuser->id, 'historic', $pagenum);
-            $totaljobs = $jobs_ids->total();
-            $numpages = ceil($totaljobs / 15);
-
-            $usertype = 'translator';
-
-            $jobs = $jobs_ids;
-            $noramlJobs = $jobs_ids;
-//            $jobs['data'] = $noramlJobs;
-//            $jobs['total'] = $totaljobs;
-            return ['emergencyJobs' => $emergencyJobs, 'noramlJobs' => $noramlJobs, 'jobs' => $jobs, 'cuser' => $cuser, 'usertype' => $usertype, 'numpages' => $numpages, 'pagenum' => $pagenum];
+        $emergencyJobs = [];
+        $normalJobs = [];
+        $jobs = null;
+    
+        if ($cuser) {
+            if ($cuser->is('customer')) {
+                $jobs = $this->getCustomerJobsHistory($cuser, $page);
+                $usertype = 'customer';
+            } elseif ($cuser->is('translator')) {
+                $jobs = $this->getTranslatorJobsHistory($cuser, $page, $normalJobs);
+                $usertype = 'translator';
+            }
         }
+    
+        $numpages = $jobs ? $jobs->lastPage() : 0;
+    
+        return [
+            'emergencyJobs' => $emergencyJobs,
+            'normalJobs' => $normalJobs,
+            'jobs' => $jobs,
+            'cuser' => $cuser,
+            'usertype' => $usertype,
+            'numpages' => $numpages,
+            'pagenum' => $page,
+        ];
     }
+
+    private function getCustomerJobsHistory($cuser, $page)
+    {
+        return $cuser->jobs()
+            ->with('user.userMeta', 'user.average', 'translatorJobRel.user.average', 'language', 'feedback', 'distance')
+            ->whereIn('status', ['completed', 'withdrawbefore24', 'withdrawafter24', 'timedout'])
+            ->orderBy('due', 'desc')
+            ->paginate(15, ['*'], 'page', $page);
+    }
+
+    private function getTranslatorJobsHistory($cuser, $page, &$normalJobs)
+    {
+        $jobs_ids = Job::getTranslatorJobsHistoric($cuser->id, 'historic', $page);
+        $totaljobs = $jobs_ids->total();
+        $normalJobs = $jobs_ids;
+
+        return $jobs_ids;
+}
 
     /**
      * @param $user
